@@ -3,7 +3,7 @@
 
 // Configuration
 
-#define MAX_ROTATION_PER_MIN 6
+#define MAX_ROTATION_PER_MIN 300
 
 #define LED_SWITCH_PERIOD_IN_US 1000000
 #define LED_FAST_SWITCH_PERIOD_IN_US 100000
@@ -117,6 +117,9 @@ unsigned long missedStepSwitch = 0;
 bool lastStepState = LOW;
 unsigned long stepSwitchCount = 0;
 
+ bool wasEnabled = false;
+ bool wasTurning = false;
+
 void loop()
 {
   unsigned long loopTime = micros();
@@ -125,7 +128,8 @@ void loop()
   int inSpeed = readInSpeed();
 
   // toggle EN
-  bool isEnabled = inSpeed > 0;
+  bool isEnabled = (!wasEnabled && inSpeed > 10 || wasEnabled && inSpeed > 0);
+  wasEnabled = isEnabled;
   setEnable(CHANNEL_1, isEnabled);
   setEnable(CHANNEL_2, isEnabled);
 
@@ -133,7 +137,7 @@ void loop()
   unsigned long currentFreq = (MAX_FREQ_IN_HZ * (unsigned long) inSpeed) / (unsigned long) IN_MAX_SPEED;
 
   unsigned long periodInUs = 0;
-  if (currentFreq > 0) {
+  if ((!wasTurning && currentFreq > 40) || (wasTurning && currentFreq > 20)) {
     periodInUs = US_PER_S / (2 * currentFreq);
     if (periodical(loopTime, periodInUs, &lastStepSwitchTime, &missedStepSwitch)) {
       lastStepState = !lastStepState;
@@ -141,8 +145,10 @@ void loop()
       setStep(CHANNEL_2, lastStepState);
       stepSwitchCount++;
     }
+    wasTurning = true;
   } else {
     lastStepSwitchTime = loopTime;
+    wasTurning = false;
   }
 
   // blink led
@@ -154,6 +160,8 @@ void loop()
     lastLedState = !lastLedState;
     digitalWrite(LED_BUILTIN, lastLedState);
   }
+
+  return;
   
   // produce logs
   if (periodical(loopTime, LOG_PERIOD_IN_US, &lastLogTime)) {
