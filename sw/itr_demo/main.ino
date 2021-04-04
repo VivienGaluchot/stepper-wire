@@ -65,7 +65,7 @@ void setup() {
     Serial.begin(115200);
 
     Serial.println("===================");
-    Serial.println("Firware: v0");
+    Serial.println("Firmware: itr_demo v0");
 
     Serial.println("Setup done");
 }
