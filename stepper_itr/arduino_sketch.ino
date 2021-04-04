@@ -26,20 +26,40 @@ bool periodical(unsigned long currentTime, unsigned long period, unsigned long *
 // 16 MHz main clock frequency
 #define MAIN_FREQ 16000000
 
-#define PRESCALE_1 0b001     // 16 MHz
-#define PRESCALE_8 0b010     // 2  MHz
-#define PRESCALE_32 0b011    // 500 kHz
-#define PRESCALE_64 0b100    // 250 kHz
-#define PRESCALE_128 0b101   // 125 kHz
-#define PRESCALE_256 0b110   // 62,5 kHz
-#define PRESCALE_1024 0b111  // 15,6 kHz
+#define TIMER1_PRESCALE_1 0b001     // 16 MHz
+#define TIMER1_PRESCALE_8 0b010     // 2  MHz
+#define TIMER1_PRESCALE_64 0b011    // 250 kHz
+#define TIMER1_PRESCALE_256 0b100   // 62,5 kHz
+#define TIMER1_PRESCALE_1024 0b101  // 15,6 kHz
+
+#define TIMER2_PRESCALE_1 0b001     // 16 MHz
+#define TIMER2_PRESCALE_8 0b010     // 2  MHz
+#define TIMER2_PRESCALE_32 0b011    // 500 kHz
+#define TIMER2_PRESCALE_64 0b100    // 250 kHz
+#define TIMER2_PRESCALE_128 0b101   // 125 kHz
+#define TIMER2_PRESCALE_256 0b110   // 62,5 kHz
+#define TIMER2_PRESCALE_1024 0b111  // 15,6 kHz
 
 void setup() {
     noInterrupts();
-    TCCR2A = 0;                      // default
-    TCCR2B = 0;                      // default
-    TCCR2B = TCCR2B | PRESCALE_256;  // increment each 16us
-    TIMSK2 = 0b00000001;             // TOIE2 interrupt
+    // Timer 1 - 16 bit timer
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TIMSK1 = 0;
+    TCCR1B = TCCR1B | TIMER1_PRESCALE_256;  // increment each 16us
+    TIMSK1 |= (1 << OCIE1A);                // compare match interrupt
+    OCR1A = 99;                             // interrupt at 99
+    TCNT1 = 0;                              // counter at 0
+
+    // Timer 2 - 8 bit timer
+    TCCR2A = 0;
+    TCCR2B = 0;
+    TIMSK2 = 0;
+    TCNT2 = 0;
+    TCCR2B = TCCR2B | TIMER2_PRESCALE_256;  // increment each 16us
+    TIMSK2 |= (1 << OCIE2A);                // compare match interrupt
+    OCR2A = 99;                             // interrupt at 99
+    TCNT2 = 0;                              // counter at 0
     interrupts();
 
     Serial.begin(115200);
@@ -55,7 +75,8 @@ bool lastLedState = LOW;
 
 unsigned long lastLogTime = 0;
 
-volatile unsigned long itrCounter = 0;
+volatile unsigned long timer1ItrCounter = 0;
+volatile unsigned long timer2ItrCounter = 0;
 
 void loop() {
     unsigned long loopTime = micros();
@@ -73,21 +94,29 @@ void loop() {
         Serial.print("LoopTime : ");
         Serial.println(loopTime);
 
-        unsigned long counterValue = itrCounter;
-        Serial.print("itrCounter : ");
+        unsigned long counterValue;
+        counterValue = timer1ItrCounter;
+        Serial.print("timer1ItrCounter : ");
         Serial.println(counterValue);
-        itrCounter = itrCounter - counterValue;
-    }
+        timer1ItrCounter = timer1ItrCounter - counterValue;
 
-    delay(10);
+        counterValue = timer2ItrCounter;
+        Serial.print("timer2ItrCounter : ");
+        Serial.println(counterValue);
+        timer2ItrCounter = timer2ItrCounter - counterValue;
+    }
 }
 
-ISR(TIMER2_OVF_vect) {
+ISR(TIMER1_COMPA_vect) {
     noInterrupts();
+    timer1ItrCounter++;
+    TCNT1 = 0;
+    interrupts();
+}
 
-    // next interrupt in 25 timer tick
-    TCNT2 = (256 - 25);
-    itrCounter++;
-
+ISR(TIMER2_COMPA_vect) {
+    noInterrupts();
+    timer2ItrCounter++;
+    TCNT2 = 0;
     interrupts();
 }
