@@ -112,9 +112,11 @@ bool lastLedState = LOW;
 
 unsigned long lastLogTime = 0;
 
+unsigned long cycleCount = 0;
+
 unsigned long lastStepSwitchTime = 0;
 unsigned long missedStepSwitch = 0;
-bool lastStepState = LOW;
+// bool lastStepState = LOW;
 unsigned long stepSwitchCount = 0;
 
  bool wasEnabled = false;
@@ -140,9 +142,11 @@ void loop()
   if ((!wasTurning && currentFreq > 40) || (wasTurning && currentFreq > 20)) {
     periodInUs = US_PER_S / (2 * currentFreq);
     if (periodical(loopTime, periodInUs, &lastStepSwitchTime, &missedStepSwitch)) {
-      lastStepState = !lastStepState;
-      setStep(CHANNEL_1, lastStepState);
-      setStep(CHANNEL_2, lastStepState);
+      // lastStepState = !lastStepState;
+      setStep(CHANNEL_1, HIGH);
+      setStep(CHANNEL_2, HIGH);
+      setStep(CHANNEL_1, LOW);
+      setStep(CHANNEL_2, LOW);
       stepSwitchCount++;
     }
     wasTurning = true;
@@ -169,6 +173,10 @@ void loop()
     Serial.print("LoopTime : ");
     Serial.println(loopTime);
     
+    Serial.print("cycle : ");
+    Serial.println(cycleCount);    
+    cycleCount = 0;
+    
     Serial.print("inSpeed : ");
     Serial.println(inSpeed);    
     
@@ -189,4 +197,6 @@ void loop()
     Serial.println(missedStepSwitch);
     missedStepSwitch = 0;
   }
+  
+  cycleCount += 1;
 }
