@@ -4,7 +4,6 @@
 
 State: prototype
 
-
 # Refs
 
-Arduinot timer interrupts: https://sites.google.com/site/qeewiki/books/avr-guide/timers-on-the-atmega328
+Arduino timer interrupts: https://sites.google.com/site/qeewiki/books/avr-guide/timers-on-the-atmega328
