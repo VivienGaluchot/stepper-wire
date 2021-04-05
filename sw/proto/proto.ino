@@ -75,7 +75,7 @@ bool periodical(unsigned long currentTime, unsigned long period, unsigned long *
 // Public services
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(PIN_IN_SPEED, INPUT);
 
