@@ -21,7 +21,7 @@
 // minimal speed in rpm
 #define MIN_SPEED_MOTOR_RPM 6UL
 // maximal speed in rpm
-#define MAX_SPEED_MOTOR_RPM 2000UL
+#define MAX_SPEED_MOTOR_RPM 1200UL
 
 #define SEC_PER_MIN 60UL
 #define ITR_PER_STEP 2UL
@@ -42,11 +42,11 @@ const uint32_t MAX_SPEED_ITR_PERIOD_IN_NS = FREQ_IN_HZ_TO_PERIOD_IN_NS(MAX_SPEED
 // 16 MHz main clock frequency
 #define MAIN_FREQ 16000000UL
 
-#define TIMER1_PRESCALER_REG_1 0b001     // 16 MHz
-#define TIMER1_PRESCALER_REG_8 0b010     // 2  MHz
-#define TIMER1_PRESCALER_REG_64 0b011    // 250 kHz
-#define TIMER1_PRESCALER_REG_256 0b100   // 62,5 kHz
-#define TIMER1_PRESCALER_REG_1024 0b101  // 15,6 kHz
+#define TIMER1_PRESCALER_REG_1 (1 << CS10)                 // 16 MHz
+#define TIMER1_PRESCALER_REG_8 (1 << CS11)                 // 2  MHz
+#define TIMER1_PRESCALER_REG_64 (1 << CS11 | 1 << CS10)    // 250 kHz
+#define TIMER1_PRESCALER_REG_256 (1 << CS12)               // 62,5 kHz
+#define TIMER1_PRESCALER_REG_1024 (1 << CS12 | 1 << CS10)  // 15,6 kHz
 
 #define TIMER1_PRESCALER_REG TIMER1_PRESCALER_REG_8
 #define TIMER1_PRESCALER 8
@@ -89,10 +89,11 @@ void setup() {
     TCCR1A = 0;
     TCCR1B = 0;
     TIMSK1 = 0;
-    TCCR1B = TCCR1B | TIMER1_PRESCALER_REG;  // set the selected prescaler
-    TIMSK1 |= (1 << OCIE1A);                 // compare match interrupt
-    OCR1A = MAX_SPEED_TIMER1_COUNT;          // interrupt at MIN_SPEED_TIMER1_COUNT
-    TCNT1 = 0;                               // counter at 0
+    TCCR1B |= TIMER1_PRESCALER_REG;  // set the selected prescaler
+    TCCR1B |= (1 << WGM12);          // CTC mode with top value OCR1A
+    TIMSK1 |= (1 << OCIE1A);         // compare match interrupt
+    OCR1A = MAX_SPEED_TIMER1_COUNT;  // interrupt at MIN_SPEED_TIMER1_COUNT
+    TCNT1 = 0;                       // counter at 0
     interrupts();
 
     Serial.begin(115200);
@@ -159,8 +160,5 @@ void loop() {
 }
 
 ISR(TIMER1_COMPA_vect) {
-    noInterrupts();
     timer1ItrCounter++;
-    TCNT1 = 0;
-    interrupts();
 }
