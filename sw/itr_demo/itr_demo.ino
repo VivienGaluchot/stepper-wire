@@ -21,7 +21,7 @@
 // minimal speed in rpm
 #define MIN_SPEED_MOTOR_RPM 6UL
 // maximal speed in rpm
-#define MAX_SPEED_MOTOR_RPM 1200UL
+#define MAX_SPEED_MOTOR_RPM 2000UL
 
 #define SEC_PER_MIN 60UL
 #define ITR_PER_STEP 2UL
