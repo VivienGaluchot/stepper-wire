@@ -89,11 +89,11 @@ void setup() {
     TCCR1A = 0;
     TCCR1B = 0;
     TIMSK1 = 0;
-    TCCR1B |= TIMER1_PRESCALER_REG;  // set the selected prescaler
-    TCCR1B |= (1 << WGM12);          // CTC mode with top value OCR1A
-    TIMSK1 |= (1 << OCIE1A);         // compare match interrupt
-    OCR1A = MAX_SPEED_TIMER1_COUNT;  // interrupt at MIN_SPEED_TIMER1_COUNT
-    TCNT1 = 0;                       // counter at 0
+    TCCR1B |= TIMER1_PRESCALER_REG;      // set the selected prescaler
+    TCCR1B |= (1 << WGM12);              // CTC mode with top value OCR1A
+    TIMSK1 |= (1 << OCIE1A);             // compare match interrupt
+    OCR1A = MAX_SPEED_TIMER1_COUNT - 1;  // interrupt at MIN_SPEED_TIMER1_COUNT
+    TCNT1 = 0;                           // counter at 0
     interrupts();
 
     Serial.begin(115200);
