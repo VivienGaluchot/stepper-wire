@@ -8,7 +8,11 @@
 // Led
 
 #define LED_SWITCH_PERIOD_IN_US 1000000
-#define LOG_PERIOD_IN_US 1000000
+
+// Monitoring
+
+#define IS_SERIAL_LOG_ENABLED true
+#define SERIAL_LOG_PERIOD_IN_US 1000000
 
 // Motor
 
@@ -66,6 +70,17 @@ static_assert(MAX_SPEED_TIMER1_COUNT > 0, "speed range not supported by timer");
 // Private services
 // -------------------------------------------------------------
 
+void errorTrap(int code) {
+    Serial.print("-- error trap: ");
+    Serial.println(code);
+    delay(100);
+    noInterrupts();
+    pinMode(LED_BUILTIN, OUTPUT);
+    digitalWrite(LED_BUILTIN, HIGH);
+    while (true) {
+    }
+}
+
 bool periodical(uint32_t currentTime, uint32_t period, uint32_t *lastTime, uint32_t *missedPeriod = nullptr) {
     bool hasTrigger = false;
     uint32_t missedTrigger = (currentTime - *lastTime) / period;
@@ -79,23 +94,41 @@ bool periodical(uint32_t currentTime, uint32_t period, uint32_t *lastTime, uint3
     return hasTrigger;
 }
 
+void disableTimer1() {
+    noInterrupts();
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TIMSK1 = 0;
+    interrupts();
+}
+
+void setPeriodTimer1(uint32_t itrPeriodInNs) {
+    int32_t cmp = TIMER1_COUNT_FOR_PERIOD_IN_NS(itrPeriodInNs) - 1;
+    if (cmp >= (1L << 16) || cmp < 1) {
+        errorTrap(1);
+    }
+    noInterrupts();
+    OCR1A = cmp;  // set timer compare register
+    interrupts();
+}
+
+void enableTimer1() {
+    noInterrupts();
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TIMSK1 = 0;
+    TCNT1 = 0;                       // counter at 0
+    TCCR1B |= TIMER1_PRESCALER_REG;  // enable with the selected prescaler
+    TCCR1B |= (1 << WGM12);          // CTC mode with top value OCR1A
+    TIMSK1 |= (1 << OCIE1A);         // compare match interrupt
+    interrupts();
+}
+
 // -------------------------------------------------------------
 // Public services
 // -------------------------------------------------------------
 
 void setup() {
-    noInterrupts();
-    // Timer 1 - 16 bit timer
-    TCCR1A = 0;
-    TCCR1B = 0;
-    TIMSK1 = 0;
-    TCCR1B |= TIMER1_PRESCALER_REG;      // set the selected prescaler
-    TCCR1B |= (1 << WGM12);              // CTC mode with top value OCR1A
-    TIMSK1 |= (1 << OCIE1A);             // compare match interrupt
-    OCR1A = MAX_SPEED_TIMER1_COUNT - 1;  // interrupt at MIN_SPEED_TIMER1_COUNT
-    TCNT1 = 0;                           // counter at 0
-    interrupts();
-
     Serial.begin(115200);
 
     Serial.println("===================");
@@ -126,6 +159,10 @@ void setup() {
     Serial.println(MAX_SPEED_TIMER1_COUNT);
 
     Serial.println("Setup done");
+
+    disableTimer1();
+    setPeriodTimer1(MAX_SPEED_ITR_PERIOD_IN_NS);
+    enableTimer1();
 }
 
 uint32_t lastLedSwitchTime = 0;
@@ -146,15 +183,15 @@ void loop() {
     }
 
     // produce logs
-    if (periodical(loopTime, LOG_PERIOD_IN_US, &lastLogTime)) {
+    if (IS_SERIAL_LOG_ENABLED && periodical(loopTime, SERIAL_LOG_PERIOD_IN_US, &lastLogTime)) {
         Serial.println("---");
-        Serial.print("LoopTime : ");
+        Serial.print("time : ");
         Serial.println(loopTime);
 
         uint32_t counterValue;
         counterValue = timer1ItrCounter;
         timer1ItrCounter -= counterValue;
-        Serial.print("timer1ItrCounter : ");
+        Serial.print("itr count : ");
         Serial.println(counterValue);
     }
 }
