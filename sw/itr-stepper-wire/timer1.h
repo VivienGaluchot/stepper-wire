@@ -33,6 +33,9 @@ void disableTimer1();
 
 void setPeriodTimer1(uint32_t itrPeriodInNs);
 
+// TODO ramp
+// void setRampPeriodTimer(uint32_t finalItrPeriodInNs, uint32_t maxDiffPerNs);
+
 void enableTimer1(void (*callback)(void));
 
 #endif

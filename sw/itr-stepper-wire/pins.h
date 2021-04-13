@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define PIN_IN_SPEED A0
+#define PIN_IN_HAND_POT A0
 
 #define PIN_OUT_CH1_DIR 2
 #define PIN_OUT_CH1_STEP 3
@@ -20,7 +20,21 @@
 enum Channel_T {
     CHANNEL_1 = 0,
     CHANNEL_2 = 1,
-    CH_COUNT
+    CHANNEL_COUNT
 };
+
+void initializePins();
+
+int readHandPot();
+
+void setDirection(Channel_T channel, bool isClockwise);
+
+void setStep(Channel_T channel, bool isHigh);
+
+void setMs1(Channel_T channel, bool isHigh);
+
+void setMs2(Channel_T channel, bool isHigh);
+
+void setEnable(Channel_T channel, bool isDriverEnabled);
 
 #endif

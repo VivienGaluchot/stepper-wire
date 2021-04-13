@@ -3,13 +3,21 @@
 #include <Arduino.h>
 #include <avr/interrupt.h>
 
-#include "error.h"
+#include "errors.h"
 
 // -------------------------------------------------------------
 // Private variables
 // -------------------------------------------------------------
 
 static void (*itrCallback)(void) = 0;
+
+// -------------------------------------------------------------
+// Private services
+// -------------------------------------------------------------
+
+ISR(TIMER1_COMPA_vect) {
+    (*itrCallback)();
+}
 
 // -------------------------------------------------------------
 // Public services
@@ -45,12 +53,4 @@ void enableTimer1(void (*callback)(void)) {
 
     itrCallback = callback;
     interrupts();
-}
-
-// -------------------------------------------------------------
-// Private services
-// -------------------------------------------------------------
-
-ISR(TIMER1_COMPA_vect) {
-    (*itrCallback)();
 }

@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <avr/interrupt.h>
 
-#include "pin.h"
+#include "pins.h"
 #include "timer1.h"
 
 // -------------------------------------------------------------
@@ -36,7 +36,7 @@
 #define MAX_SPEED_MOTOR_RPM 2000UL
 
 // -------------------------------------------------------------
-// Timers
+// ITR period computation
 // -------------------------------------------------------------
 
 #define SEC_PER_MIN 60ULL
@@ -60,6 +60,17 @@ static_assert(MIN_SPEED_TIMER1_COUNT > 0, "speed range not supported by timer");
 static_assert(MAX_SPEED_TIMER1_COUNT > 0, "speed range not supported by timer");
 
 // -------------------------------------------------------------
+// Private variables
+// -------------------------------------------------------------
+
+uint32_t timer1ItrCounter = 0;
+
+uint32_t lastLedSwitchTime = 0;
+bool lastLedState = LOW;
+
+uint32_t lastLogTime = 0;
+
+// -------------------------------------------------------------
 // Private services
 // -------------------------------------------------------------
 
@@ -76,8 +87,6 @@ bool periodical(uint32_t currentTime, uint32_t period, uint32_t *lastTime, uint3
     return hasTrigger;
 }
 
-uint32_t timer1ItrCounter = 0;
-
 void timerCallback() {
     timer1ItrCounter++;
 }
@@ -88,7 +97,6 @@ void timerCallback() {
 
 void setup() {
     Serial.begin(115200);
-
     Serial.println("===================");
     Serial.println("Firmware: itr-stepper-wire v0");
 
@@ -116,20 +124,25 @@ void setup() {
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_TIMER1_COUNT);
 
+    initializePins();
+    setEnable(CHANNEL_1, false);
+    setEnable(CHANNEL_2, false);
+    setDirection(CHANNEL_1, true);
+    setDirection(CHANNEL_2, false);
+
     Serial.println("Setup done");
 
+    // timer test
     disableTimer1();
     setPeriodTimer1(MAX_SPEED_ITR_PERIOD_IN_NS);
     enableTimer1(&timerCallback);
 }
 
-uint32_t lastLedSwitchTime = 0;
-bool lastLedState = LOW;
-
-uint32_t lastLogTime = 0;
-
 void loop() {
     uint32_t loopTime = micros();
+
+    // read inputs
+    int handPot = readHandPot();
 
     // blink led
     uint32_t ledSwitchPeriod = LED_SWITCH_PERIOD_IN_US;
@@ -141,8 +154,11 @@ void loop() {
     // produce logs
     if (IS_SERIAL_LOG_ENABLED && periodical(loopTime, SERIAL_LOG_PERIOD_IN_US, &lastLogTime)) {
         Serial.println("---");
-        Serial.print("time : ");
+        Serial.print("time      : ");
         Serial.println(loopTime);
+
+        Serial.print("hand pot  : ");
+        Serial.println(handPot);
 
         uint32_t counterValue;
         counterValue = timer1ItrCounter;

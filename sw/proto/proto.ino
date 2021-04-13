@@ -75,7 +75,7 @@ bool periodical(unsigned long currentTime, unsigned long period, unsigned long *
 // Public services
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(9600);
     pinMode(LED_BUILTIN, OUTPUT);
     pinMode(PIN_IN_SPEED, INPUT);
 
@@ -152,8 +152,6 @@ void loop() {
         lastLedState = !lastLedState;
         digitalWrite(LED_BUILTIN, lastLedState);
     }
-
-    return;
 
     // produce logs
     if (periodical(loopTime, LOG_PERIOD_IN_US, &lastLogTime)) {
