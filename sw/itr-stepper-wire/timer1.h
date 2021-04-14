@@ -22,20 +22,45 @@
 #define TIMER1_PRESCALER 8ULL
 
 // Helpers
-#define TIMER1_PERIOD_IN_NS ((1000000000ULL * TIMER1_PRESCALER) / MAIN_FREQ)
-#define TIMER1_COUNT_FOR_PERIOD_IN_NS(x) (x / TIMER1_PERIOD_IN_NS)
+#define NS_PER_S 1000000000ULL
+#define PERIOD_IN_NS_FOR_FREQ_IN_HZ(freq) (NS_PER_S / freq)
+#define FREQ_IN_HS_FOR_PERIOD_IN_NS(period) (NS_PER_S / period)
+
+const uint16_t TIMER1_PERIOD_IN_NS = ((NS_PER_S * TIMER1_PRESCALER) / MAIN_FREQ);
+#define TIMER1_COUNT_FOR_PERIOD_IN_NS(period) (((period) / TIMER1_PERIOD_IN_NS) - 1ULL)
+#define TIMER1_COUNT_FOR_FREQUENCY_IN_HZ(freq) TIMER1_COUNT_FOR_PERIOD_IN_NS(PERIOD_IN_NS_FOR_FREQ_IN_HZ(freq))
+
+#define STATIC_CHECK_FREQ_IN_RANGE(freq)                                    \
+    static_assert(TIMER1_COUNT_FOR_FREQUENCY_IN_HZ(freq) > 0 &&             \
+                      TIMER1_COUNT_FOR_FREQUENCY_IN_HZ(freq) < (1UL << 16), \
+                  "speed range not supported by current timer1 configuration")
 
 // -------------------------------------------------------------
 // Services
 // -------------------------------------------------------------
 
-void disableTimer1();
+namespace timer1 {
 
-void setPeriodTimer1(uint32_t itrPeriodInNs);
+uint16_t countForFrequency(int32_t itrFreqInHz);
 
-// TODO ramp
-// void setRampPeriodTimer(uint32_t finalItrPeriodInNs, uint32_t maxDiffPerNs);
+void disable();
 
-void enableTimer1(void (*callback)(void));
+void enable(void (*callback)(void));
+
+void setFrequency(uint32_t itrFreqInHz);
+
+// the interrupt frequency will be brought to itrFreqInHz
+// by keeping a maximum changing rate of maxRateHzPerUs
+void setRampFrequency(uint32_t itrFreqInHz, uint32_t maxRateHzPerUs);
+
+uint32_t getFrequencyInHz();
+
+// diagnostics
+
+uint16_t getCmpCounter();
+
+uint16_t popFlushedTicks();
+
+}  // namespace timer1
 
 #endif

@@ -48,16 +48,14 @@
 const uint32_t MIN_SPEED_ITR_FREQ_IN_HZ = RPM_TO_ITR_FREQ_IN_HZ(MIN_SPEED_MOTOR_RPM);
 const uint32_t MAX_SPEED_ITR_FREQ_IN_HZ = RPM_TO_ITR_FREQ_IN_HZ(MAX_SPEED_MOTOR_RPM);
 
+STATIC_CHECK_FREQ_IN_RANGE(MIN_SPEED_ITR_FREQ_IN_HZ);
+STATIC_CHECK_FREQ_IN_RANGE(MAX_SPEED_ITR_FREQ_IN_HZ);
+
 const uint32_t MIN_SPEED_ITR_PERIOD_IN_NS = FREQ_IN_HZ_TO_PERIOD_IN_NS(MIN_SPEED_ITR_FREQ_IN_HZ);
 const uint32_t MAX_SPEED_ITR_PERIOD_IN_NS = FREQ_IN_HZ_TO_PERIOD_IN_NS(MAX_SPEED_ITR_FREQ_IN_HZ);
 
 const uint32_t MIN_SPEED_TIMER1_COUNT = TIMER1_COUNT_FOR_PERIOD_IN_NS(MIN_SPEED_ITR_PERIOD_IN_NS);
 const uint32_t MAX_SPEED_TIMER1_COUNT = TIMER1_COUNT_FOR_PERIOD_IN_NS(MAX_SPEED_ITR_PERIOD_IN_NS);
-
-static_assert(MIN_SPEED_TIMER1_COUNT < (1UL << 16), "speed range not supported by timer");
-static_assert(MAX_SPEED_TIMER1_COUNT < (1UL << 16), "speed range not supported by timer");
-static_assert(MIN_SPEED_TIMER1_COUNT > 0, "speed range not supported by timer");
-static_assert(MAX_SPEED_TIMER1_COUNT > 0, "speed range not supported by timer");
 
 // -------------------------------------------------------------
 // Private variables
@@ -96,6 +94,12 @@ void timerCallback() {
 // -------------------------------------------------------------
 
 void setup() {
+    initializePins();
+    setEnable(CHANNEL_1, false);
+    setEnable(CHANNEL_2, false);
+    setDirection(CHANNEL_1, true);
+    setDirection(CHANNEL_2, false);
+
     Serial.begin(115200);
     Serial.println("===================");
     Serial.println("Firmware: itr-stepper-wire v0");
@@ -124,18 +128,15 @@ void setup() {
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_TIMER1_COUNT);
 
-    initializePins();
-    setEnable(CHANNEL_1, false);
-    setEnable(CHANNEL_2, false);
-    setDirection(CHANNEL_1, true);
-    setDirection(CHANNEL_2, false);
+    // sleep to wait for power suply stabilisation
+    delay(500);
 
     Serial.println("Setup done");
 
     // timer test
-    disableTimer1();
-    setPeriodTimer1(MAX_SPEED_ITR_PERIOD_IN_NS);
-    enableTimer1(&timerCallback);
+    timer1::disable();
+    timer1::setFrequency(MIN_SPEED_ITR_FREQ_IN_HZ);
+    timer1::enable(&timerCallback);
 }
 
 void loop() {
@@ -154,16 +155,31 @@ void loop() {
     // produce logs
     if (IS_SERIAL_LOG_ENABLED && periodical(loopTime, SERIAL_LOG_PERIOD_IN_US, &lastLogTime)) {
         Serial.println("---");
-        Serial.print("time      : ");
+        Serial.print("time       : ");
         Serial.println(loopTime);
 
-        Serial.print("hand pot  : ");
+        Serial.print("hand pot   : ");
         Serial.println(handPot);
 
-        uint32_t counterValue;
-        counterValue = timer1ItrCounter;
+        uint32_t counterValue = timer1ItrCounter;
         timer1ItrCounter -= counterValue;
-        Serial.print("itr count : ");
+        Serial.print("itr count  : ");
         Serial.println(counterValue);
+
+        Serial.print("timer1 freq: ");
+        Serial.println(timer1::getFrequencyInHz());
+
+        int32_t flushed = timer1::popFlushedTicks();
+        if (flushed != 0) {
+            Serial.print("warning, timer1 flushed ticks: ");
+            Serial.println(flushed);
+        }
+
+        if (timer1::getFrequencyInHz() == MAX_SPEED_ITR_FREQ_IN_HZ) {
+            timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 0);
+        }
+        if (timer1::getFrequencyInHz() == MIN_SPEED_ITR_FREQ_IN_HZ) {
+            timer1::setRampFrequency(MAX_SPEED_ITR_FREQ_IN_HZ, 0);
+        }
     }
 }
