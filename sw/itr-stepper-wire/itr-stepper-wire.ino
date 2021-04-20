@@ -97,8 +97,6 @@ void setup() {
     initializePins();
     setEnable(CHANNEL_1, false);
     setEnable(CHANNEL_2, false);
-    setDirection(CHANNEL_1, true);
-    setDirection(CHANNEL_2, false);
 
     Serial.begin(115200);
     Serial.println("===================");
@@ -130,6 +128,13 @@ void setup() {
 
     // sleep to wait for power suply stabilisation
     delay(500);
+
+    setDirection(CHANNEL_1, true);
+    setDirection(CHANNEL_2, false);
+    setMs1(CHANNEL_1, DRIVER_MS1_STATE);
+    setMs1(CHANNEL_2, DRIVER_MS1_STATE);
+    setMs2(CHANNEL_1, DRIVER_MS2_STATE);
+    setMs2(CHANNEL_2, DRIVER_MS2_STATE);
 
     Serial.println("Setup done");
 
