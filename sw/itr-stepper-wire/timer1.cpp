@@ -33,12 +33,11 @@ static volatile uint16_t rampFinalInHz = 0;
 // -------------------------------------------------------------
 
 ISR(TIMER1_COMPA_vect) {
-    noInterrupts();
     (*itrCallback)();
 
     if (rampIsEnabled) {
         rampLastPeriod += OCR1A;
-        uint16_t missedRamp = (rampLastPeriod / rampPeriod);
+        uint16_t missedRamp = rampLastPeriod / rampPeriod;
         if (missedRamp > 0) {
             uint16_t freqStep = rampStepInHz * missedRamp;
             if (rampFinalInHz < currentItrFreqInHz) {
@@ -60,19 +59,10 @@ ISR(TIMER1_COMPA_vect) {
             } else {
                 rampIsEnabled = false;
             }
+            rampLastPeriod -= missedRamp * rampPeriod;
             OCR1A = TIMER1_COUNT_FOR_FREQUENCY_IN_HZ(currentItrFreqInHz);
-            rampLastPeriod %= rampPeriod;
         }
     }
-
-    // flush counter if the CPU can't keep up with the interrupt frequency
-    volatile uint16_t cntr = TCNT1;
-    if (OCR1A < cntr) {
-        flushedTicks += cntr;
-        TCNT1 -= cntr;
-    }
-
-    interrupts();
 }
 
 // -------------------------------------------------------------
@@ -119,19 +109,46 @@ void timer1::setFrequency(uint32_t itrFreqInHz) {
     interrupts();
 }
 
-void timer1::setRampFrequency(uint32_t itrFreqInHz, uint32_t maxRateHzPerUs) {
+void timer1::setRampFrequency(uint32_t itrFreqInHz, uint32_t rateInHzPerS) {
+    // minimal ramp period to prevent main loop stall: 1ms
+    const uint32_t safeRampPeriodInUs = 1000;
+
     // check requested frequency is in range
     countForFrequency(itrFreqInHz);
 
+    // compute optimal period and step for a smooth / precise ramp
+    uint32_t periodInUs = 1000000UL;
+    uint32_t stepInHz = rateInHzPerS;
+    const uint32_t maxScale = periodInUs / safeRampPeriodInUs;
+    uint32_t scale = min(stepInHz, maxScale);
+    periodInUs /= scale;
+    stepInHz /= scale;
+
+    uint32_t periodInTicks = TIMER1_COUNT_FOR_PERIOD_IN_NS(periodInUs * 1000);
+    if (periodInTicks >= (1UL << 16)) {
+        Serial.print("periodInTicks ");
+        Serial.println(periodInTicks);
+        errorTrap(TIMER_1_RAMPING_RATE_OUT_OF_RANGE);
+    }
+
+    bool hasChanged = false;
     rampIsEnabled = false;
 
+    // taget frequency
+    hasChanged = hasChanged || rampFinalInHz != itrFreqInHz;
     rampFinalInHz = itrFreqInHz;
-    rampLastPeriod = 0;
-    // ramp by step of 10 Hz
-    rampStepInHz = 10;
-    // ramp each 10 ms
-    // Warning, too small values lead to CPU stall
-    rampPeriod = 10000000UL / TIMER1_PERIOD_IN_NS;
+    // ramp by step of X Hz
+    hasChanged = hasChanged || rampStepInHz != stepInHz;
+    rampStepInHz = stepInHz;
+    // ramp period in timer ticks
+    hasChanged = hasChanged || rampPeriod != periodInTicks;
+    rampPeriod = periodInTicks;
+
+    // don't reset the last period if the conf is not changed to prevent the ramp from
+    // executing when setRampFrequency is called in loop with the same parameters
+    if (hasChanged) {
+        rampLastPeriod = 0;
+    }
 
     rampIsEnabled = true;
 
@@ -142,20 +159,18 @@ void timer1::setRampFrequency(uint32_t itrFreqInHz, uint32_t maxRateHzPerUs) {
     Serial.print("  - final   ");
     Serial.println(rampFinalInHz);
 
-    Serial.print("  - period  ");
+    Serial.print("  - period in us ");
+    Serial.println(periodInUs);
+
+    Serial.print("  - period in ticks ");
     Serial.println(rampPeriod);
 
     Serial.print("  - step    ");
     Serial.println(rampStepInHz);
 }
 
-uint32_t timer1::getFrequencyInHz() {
-    uint32_t period = uint32_t(OCR1A + 1) * TIMER1_PERIOD_IN_NS;
-    return FREQ_IN_HS_FOR_PERIOD_IN_NS(period);
-}
-
-uint16_t timer1::getCmpCounter() {
-    return OCR1A;
+uint16_t timer1::getFrequencyInHz() {
+    return currentItrFreqInHz;
 }
 
 uint16_t timer1::popFlushedTicks() {

@@ -180,11 +180,11 @@ void loop() {
             Serial.println(flushed);
         }
 
-        if (timer1::getFrequencyInHz() == MAX_SPEED_ITR_FREQ_IN_HZ) {
-            timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 0);
+        if (timer1::getFrequencyInHz() >= MAX_SPEED_ITR_FREQ_IN_HZ) {
+            timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 5000);
         }
-        if (timer1::getFrequencyInHz() == MIN_SPEED_ITR_FREQ_IN_HZ) {
-            timer1::setRampFrequency(MAX_SPEED_ITR_FREQ_IN_HZ, 0);
+        if (timer1::getFrequencyInHz() <= MIN_SPEED_ITR_FREQ_IN_HZ) {
+            timer1::setRampFrequency(MAX_SPEED_ITR_FREQ_IN_HZ, 5000);
         }
     }
 }

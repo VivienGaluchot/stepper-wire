@@ -26,7 +26,7 @@
 #define PERIOD_IN_NS_FOR_FREQ_IN_HZ(freq) (NS_PER_S / freq)
 #define FREQ_IN_HS_FOR_PERIOD_IN_NS(period) (NS_PER_S / period)
 
-const uint16_t TIMER1_PERIOD_IN_NS = ((NS_PER_S * TIMER1_PRESCALER) / MAIN_FREQ);
+#define TIMER1_PERIOD_IN_NS ((NS_PER_S * TIMER1_PRESCALER) / MAIN_FREQ)
 #define TIMER1_COUNT_FOR_PERIOD_IN_NS(period) (((period) / TIMER1_PERIOD_IN_NS) - 1ULL)
 #define TIMER1_COUNT_FOR_FREQUENCY_IN_HZ(freq) TIMER1_COUNT_FOR_PERIOD_IN_NS(PERIOD_IN_NS_FOR_FREQ_IN_HZ(freq))
 
@@ -41,8 +41,6 @@ const uint16_t TIMER1_PERIOD_IN_NS = ((NS_PER_S * TIMER1_PRESCALER) / MAIN_FREQ)
 
 namespace timer1 {
 
-uint16_t countForFrequency(int32_t itrFreqInHz);
-
 void disable();
 
 void enable(void (*callback)(void));
@@ -50,14 +48,14 @@ void enable(void (*callback)(void));
 void setFrequency(uint32_t itrFreqInHz);
 
 // the interrupt frequency will be brought to itrFreqInHz
-// by keeping a maximum changing rate of maxRateHzPerUs
-void setRampFrequency(uint32_t itrFreqInHz, uint32_t maxRateHzPerUs);
+// by keeping a maximum changing rate of rateInHzPerS
+void setRampFrequency(uint32_t itrFreqInHz, uint32_t rateInHzPerS);
 
-uint32_t getFrequencyInHz();
+uint16_t getFrequencyInHz();
 
 // diagnostics
 
-uint16_t getCmpCounter();
+uint16_t countForFrequency(int32_t itrFreqInHz);
 
 uint16_t popFlushedTicks();
 
