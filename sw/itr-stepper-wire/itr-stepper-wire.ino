@@ -12,6 +12,7 @@
 
 #define IDLE_LED_SWITCH_PERIOD_IN_US 1000000
 #define ENABLED_LED_SWITCH_PERIOD_IN_US 200000
+#define ROTATING_LED_SWITCH_PERIOD_IN_US 50000
 
 // Monitoring
 
@@ -71,6 +72,8 @@ uint32_t lastLogTime = 0;
 
 bool isStepHigh = false;
 
+bool lastCycleRotating = false;
+
 // -------------------------------------------------------------
 // Private services
 // -------------------------------------------------------------
@@ -103,6 +106,7 @@ void setup() {
     initializePins();
     setEnable(CHANNEL_1, false);
     setEnable(CHANNEL_2, false);
+    timer1::disable();
 
     Serial.begin(115200);
     Serial.println("===================");
@@ -143,24 +147,40 @@ void setup() {
     setMs2(CHANNEL_2, DRIVER_MS2_STATE);
 
     Serial.println("Setup done");
-
-    // timer test
-    timer1::disable();
-    timer1::setFrequency(MIN_SPEED_ITR_FREQ_IN_HZ);
-    timer1::enable(&timerCallback);
 }
 
 void loop() {
     uint32_t loopTime = micros();
 
     // read inputs
-    int handPot = readHandPot();
+    uint16_t handPot = readHandPot();
 
     // compute cycle state
-    bool isEnabled = handPot > MIN_POT_VALUE;
+    bool isEnabled = handPot > 20;
+    bool isRotating = handPot > 200;
+
+    // set driver enable
+    setEnable(CHANNEL_1, isEnabled);
+    setEnable(CHANNEL_2, isEnabled);
+
+    // set timer period
+    if (isRotating && !lastCycleRotating) {
+        timer1::setFrequency(MIN_SPEED_ITR_FREQ_IN_HZ);
+        timer1::enable(&timerCallback);
+    } else if (!isRotating && lastCycleRotating) {
+        timer1::disable();
+    }
+
+    lastCycleRotating = isRotating;
 
     // blink led
-    uint32_t ledSwitchPeriod = isEnabled ? ENABLED_LED_SWITCH_PERIOD_IN_US : IDLE_LED_SWITCH_PERIOD_IN_US;
+    uint32_t ledSwitchPeriod = IDLE_LED_SWITCH_PERIOD_IN_US;
+    if (isEnabled) {
+        ledSwitchPeriod = ENABLED_LED_SWITCH_PERIOD_IN_US;
+    }
+    if (isRotating) {
+        ledSwitchPeriod = ROTATING_LED_SWITCH_PERIOD_IN_US;
+    }
     if (periodical(loopTime, ledSwitchPeriod, &lastLedSwitchTime)) {
         lastLedState = !lastLedState;
         digitalWrite(LED_BUILTIN, lastLedState);
@@ -175,19 +195,19 @@ void loop() {
         Serial.print("hand pot   : ");
         Serial.println(handPot);
 
-        // uint32_t counterValue = timer1ItrCounter;
-        // timer1ItrCounter -= counterValue;
-        // Serial.print("itr count  : ");
-        // Serial.println(counterValue);
+        uint32_t counterValue = timer1ItrCounter;
+        timer1ItrCounter -= counterValue;
+        Serial.print("itr count  : ");
+        Serial.println(counterValue);
 
-        // Serial.print("timer1 freq: ");
-        // Serial.println(timer1::getFrequencyInHz());
+        Serial.print("timer1 freq: ");
+        Serial.println(timer1::getFrequencyInHz());
 
-        // int32_t flushed = timer1::popFlushedTicks();
-        // if (flushed != 0) {
-        //     Serial.print("warning, timer1 flushed ticks: ");
-        //     Serial.println(flushed);
-        // }
+        int32_t flushed = timer1::popFlushedTicks();
+        if (flushed != 0) {
+            Serial.print("warning, timer1 flushed ticks: ");
+            Serial.println(flushed);
+        }
 
         // if (timer1::getFrequencyInHz() >= MAX_SPEED_ITR_FREQ_IN_HZ) {
         //     timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 5000);

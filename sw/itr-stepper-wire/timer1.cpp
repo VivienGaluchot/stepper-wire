@@ -14,7 +14,7 @@ static void (*itrCallback)(void) = 0;
 
 static volatile uint16_t flushedTicks = 0;
 
-// current timer frequency
+// current timer state
 static volatile uint16_t currentItrFreqInHz = 0;
 
 // when true the period ramp is enabled
