@@ -152,21 +152,21 @@ void timer1::setRampFrequency(uint32_t itrFreqInHz, uint32_t rateInHzPerS) {
 
     rampIsEnabled = true;
 
-    Serial.println("setRampPeriod, options:");
-    Serial.print("  - current ");
-    Serial.println(currentItrFreqInHz);
+    // Serial.println("setRampPeriod, options:");
+    // Serial.print("  - current ");
+    // Serial.println(currentItrFreqInHz);
 
-    Serial.print("  - final   ");
-    Serial.println(rampFinalInHz);
+    // Serial.print("  - final   ");
+    // Serial.println(rampFinalInHz);
 
-    Serial.print("  - period in us ");
-    Serial.println(periodInUs);
+    // Serial.print("  - period in us ");
+    // Serial.println(periodInUs);
 
-    Serial.print("  - period in ticks ");
-    Serial.println(rampPeriod);
+    // Serial.print("  - period in ticks ");
+    // Serial.println(rampPeriod);
 
-    Serial.print("  - step    ");
-    Serial.println(rampStepInHz);
+    // Serial.print("  - step    ");
+    // Serial.println(rampStepInHz);
 }
 
 uint16_t timer1::getFrequencyInHz() {

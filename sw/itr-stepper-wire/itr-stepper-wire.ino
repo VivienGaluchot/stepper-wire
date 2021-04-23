@@ -35,14 +35,14 @@
 // minimal speed in rpm
 #define MIN_SPEED_MOTOR_RPM 6UL
 // maximal speed in rpm
-#define MAX_SPEED_MOTOR_RPM 2000UL
+#define MAX_SPEED_MOTOR_RPM 340UL
 
 // -------------------------------------------------------------
 // ITR period computation
 // -------------------------------------------------------------
 
 #define SEC_PER_MIN 60ULL
-#define ITR_PER_STEP 2ULL
+#define ITR_PER_STEP 1ULL
 
 #define RPM_TO_ITR_FREQ_IN_HZ(x) (x * DRIVER_MICROSTEPPING * ITR_PER_STEP * MOTOR_STEP_PER_ROTATION / SEC_PER_MIN)
 #define FREQ_IN_HZ_TO_PERIOD_IN_NS(x) (1000000000ULL / x)
@@ -69,9 +69,9 @@ uint32_t lastLedSwitchTime = 0;
 bool lastLedState = LOW;
 
 uint32_t lastLogTime = 0;
+uint32_t lastFreqUpdateTime = 0;
 
-bool isStepHigh = false;
-
+bool lastCycleEnabled = false;
 bool lastCycleRotating = false;
 
 // -------------------------------------------------------------
@@ -93,9 +93,10 @@ bool periodical(uint32_t currentTime, uint32_t period, uint32_t *lastTime, uint3
 
 void timerCallback() {
     timer1ItrCounter++;
-    isStepHigh = !isStepHigh;
-    setStep(CHANNEL_1, isStepHigh);
-    setStep(CHANNEL_2, isStepHigh);
+    setStep(CHANNEL_1, true);
+    setStep(CHANNEL_2, true);
+    setStep(CHANNEL_1, false);
+    setStep(CHANNEL_2, false);
 }
 
 // -------------------------------------------------------------
@@ -110,7 +111,7 @@ void setup() {
 
     Serial.begin(115200);
     Serial.println("===================");
-    Serial.println("Firmware: itr-stepper-wire v0");
+    Serial.println("Firmware: itr-stepper-wire v0.1");
 
     Serial.println("Configuration:");
     Serial.print(" - DRIVER_MICROSTEPPING    ");
@@ -156,12 +157,14 @@ void loop() {
     uint16_t handPot = readHandPot();
 
     // compute cycle state
-    bool isEnabled = handPot > 20;
-    bool isRotating = handPot > 200;
+    bool isEnabled = handPot > (lastCycleEnabled ? 0 : 50);
+    bool isRotating = handPot > (lastCycleRotating ? 150 : 200);
 
     // set driver enable
-    setEnable(CHANNEL_1, isEnabled);
-    setEnable(CHANNEL_2, isEnabled);
+    if (isEnabled != lastCycleEnabled) {
+        setEnable(CHANNEL_1, isEnabled);
+        setEnable(CHANNEL_2, isEnabled);
+    }
 
     // set timer period
     if (isRotating && !lastCycleRotating) {
@@ -171,6 +174,14 @@ void loop() {
         timer1::disable();
     }
 
+    if (isRotating && periodical(loopTime, 200000, &lastFreqUpdateTime)) {
+        const uint32_t maxSpeed = MAX_POT_VALUE - 200;
+        uint32_t speed = handPot >= 200 ? handPot - 200 : 0;
+        uint32_t frequency = speed * (MAX_SPEED_ITR_FREQ_IN_HZ - MIN_SPEED_ITR_FREQ_IN_HZ) / maxSpeed + MIN_SPEED_ITR_FREQ_IN_HZ;
+        timer1::setRampFrequency(frequency, 2000);
+    }
+
+    lastCycleEnabled = isEnabled;
     lastCycleRotating = isRotating;
 
     // blink led
@@ -208,12 +219,5 @@ void loop() {
             Serial.print("warning, timer1 flushed ticks: ");
             Serial.println(flushed);
         }
-
-        // if (timer1::getFrequencyInHz() >= MAX_SPEED_ITR_FREQ_IN_HZ) {
-        //     timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 5000);
-        // }
-        // if (timer1::getFrequencyInHz() <= MIN_SPEED_ITR_FREQ_IN_HZ) {
-        //     timer1::setRampFrequency(MAX_SPEED_ITR_FREQ_IN_HZ, 5000);
-        // }
     }
 }

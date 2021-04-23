@@ -48,14 +48,20 @@ uint16_t readHandPot() {
     uint16_t rawValue = analogRead(PIN_IN_HAND_POT);
 
     // stick the raw value
-    const uint16_t stickyRange = 3;
-    if (abs(rawValue - handPotStickyValue) > stickyRange) {
-        handPotStickyValue = rawValue;
+    const uint16_t stickyRange = 10;
+    if (rawValue > handPotStickyValue) {
+        if (rawValue - handPotStickyValue > stickyRange) {
+            handPotStickyValue = rawValue;
+        }
+    } else if (handPotStickyValue > rawValue) {
+        if (handPotStickyValue - rawValue > stickyRange) {
+            handPotStickyValue = rawValue;
+        }
     }
 
     // clamp min max to output range
-    const uint16_t minRawValue = 8;
-    const uint16_t maxRawValue = (1 << 10) - 8;
+    const uint16_t minRawValue = 20;
+    const uint16_t maxRawValue = (1 << 10) - 20;
     const uint16_t clampedRange = maxRawValue - minRawValue;
     uint16_t clamped = handPotStickyValue;
     clamped = max(clamped, minRawValue);
