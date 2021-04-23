@@ -10,7 +10,8 @@
 
 // Led
 
-#define LED_SWITCH_PERIOD_IN_US 1000000
+#define IDLE_LED_SWITCH_PERIOD_IN_US 1000000
+#define ENABLED_LED_SWITCH_PERIOD_IN_US 200000
 
 // Monitoring
 
@@ -68,6 +69,8 @@ bool lastLedState = LOW;
 
 uint32_t lastLogTime = 0;
 
+bool isStepHigh = false;
+
 // -------------------------------------------------------------
 // Private services
 // -------------------------------------------------------------
@@ -87,6 +90,9 @@ bool periodical(uint32_t currentTime, uint32_t period, uint32_t *lastTime, uint3
 
 void timerCallback() {
     timer1ItrCounter++;
+    isStepHigh = !isStepHigh;
+    setStep(CHANNEL_1, isStepHigh);
+    setStep(CHANNEL_2, isStepHigh);
 }
 
 // -------------------------------------------------------------
@@ -150,8 +156,11 @@ void loop() {
     // read inputs
     int handPot = readHandPot();
 
+    // compute cycle state
+    bool isEnabled = handPot > MIN_POT_VALUE;
+
     // blink led
-    uint32_t ledSwitchPeriod = LED_SWITCH_PERIOD_IN_US;
+    uint32_t ledSwitchPeriod = isEnabled ? ENABLED_LED_SWITCH_PERIOD_IN_US : IDLE_LED_SWITCH_PERIOD_IN_US;
     if (periodical(loopTime, ledSwitchPeriod, &lastLedSwitchTime)) {
         lastLedState = !lastLedState;
         digitalWrite(LED_BUILTIN, lastLedState);
@@ -166,25 +175,25 @@ void loop() {
         Serial.print("hand pot   : ");
         Serial.println(handPot);
 
-        uint32_t counterValue = timer1ItrCounter;
-        timer1ItrCounter -= counterValue;
-        Serial.print("itr count  : ");
-        Serial.println(counterValue);
+        // uint32_t counterValue = timer1ItrCounter;
+        // timer1ItrCounter -= counterValue;
+        // Serial.print("itr count  : ");
+        // Serial.println(counterValue);
 
-        Serial.print("timer1 freq: ");
-        Serial.println(timer1::getFrequencyInHz());
+        // Serial.print("timer1 freq: ");
+        // Serial.println(timer1::getFrequencyInHz());
 
-        int32_t flushed = timer1::popFlushedTicks();
-        if (flushed != 0) {
-            Serial.print("warning, timer1 flushed ticks: ");
-            Serial.println(flushed);
-        }
+        // int32_t flushed = timer1::popFlushedTicks();
+        // if (flushed != 0) {
+        //     Serial.print("warning, timer1 flushed ticks: ");
+        //     Serial.println(flushed);
+        // }
 
-        if (timer1::getFrequencyInHz() >= MAX_SPEED_ITR_FREQ_IN_HZ) {
-            timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 5000);
-        }
-        if (timer1::getFrequencyInHz() <= MIN_SPEED_ITR_FREQ_IN_HZ) {
-            timer1::setRampFrequency(MAX_SPEED_ITR_FREQ_IN_HZ, 5000);
-        }
+        // if (timer1::getFrequencyInHz() >= MAX_SPEED_ITR_FREQ_IN_HZ) {
+        //     timer1::setRampFrequency(MIN_SPEED_ITR_FREQ_IN_HZ, 5000);
+        // }
+        // if (timer1::getFrequencyInHz() <= MIN_SPEED_ITR_FREQ_IN_HZ) {
+        //     timer1::setRampFrequency(MAX_SPEED_ITR_FREQ_IN_HZ, 5000);
+        // }
     }
 }

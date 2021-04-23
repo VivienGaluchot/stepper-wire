@@ -23,9 +23,13 @@ enum Channel_T {
     CHANNEL_COUNT
 };
 
+#define MIN_POT_VALUE 0
+#define MAX_POT_VALUE 1023
+
 void initializePins();
 
-int readHandPot();
+// return in range MIN_POT_VALUE .. MAX_POT_VALUE
+uint16_t readHandPot();
 
 void setDirection(Channel_T channel, bool isClockwise);
 

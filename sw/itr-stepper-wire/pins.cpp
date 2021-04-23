@@ -8,6 +8,8 @@ static const uint8_t PINS_MS2[CHANNEL_COUNT] = {PIN_OUT_CH1_MS2, PIN_OUT_CH2_MS2
 static const uint8_t PINS_MS1[CHANNEL_COUNT] = {PIN_OUT_CH1_MS1, PIN_OUT_CH2_MS1};
 static const uint8_t PINS_ENABLE[CHANNEL_COUNT] = {PIN_OUT_CH1_ENABLE, PIN_OUT_CH2_ENABLE};
 
+static uint16_t handPotStickyValue = 0;
+
 // -------------------------------------------------------------
 // Public services
 // -------------------------------------------------------------
@@ -41,8 +43,29 @@ void initializePins() {
     digitalWrite(PIN_OUT_CH2_ENABLE, LOW);
 }
 
-int readHandPot() {
-    return analogRead(PIN_IN_HAND_POT);
+uint16_t readHandPot() {
+    // raw value is returned on 10bit
+    uint16_t rawValue = analogRead(PIN_IN_HAND_POT);
+
+    // stick the raw value
+    const uint16_t stickyRange = 3;
+    if (abs(rawValue - handPotStickyValue) > stickyRange) {
+        handPotStickyValue = rawValue;
+    }
+
+    // clamp min max to output range
+    const uint16_t minRawValue = 8;
+    const uint16_t maxRawValue = (1 << 10) - 8;
+    const uint16_t clampedRange = maxRawValue - minRawValue;
+    uint16_t clamped = handPotStickyValue;
+    clamped = max(clamped, minRawValue);
+    clamped = min(clamped, maxRawValue);
+    clamped = clamped - minRawValue;
+    // clamped is now in range [0 .. clampedRange - 1]
+
+    const uint32_t outRange = MAX_POT_VALUE - MIN_POT_VALUE;
+    uint16_t output = ((uint32_t)clamped * (uint32_t)outRange) / (uint32_t)clampedRange;
+    return output + MIN_POT_VALUE;
 }
 
 void setDirection(Channel_T channel, bool isClockwise) {
