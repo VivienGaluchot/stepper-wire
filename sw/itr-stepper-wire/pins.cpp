@@ -10,6 +10,12 @@ static const uint8_t PINS_ENABLE[CHANNEL_COUNT] = {PIN_OUT_CH1_ENABLE, PIN_OUT_C
 
 static uint16_t handPotStickyValue = 0;
 
+#define HAND_POT_LAST_VALUE_SIZE 32
+static uint16_t handPotLastValues[HAND_POT_LAST_VALUE_SIZE] = {
+    0,
+};
+static uint8_t handPotLastValueIndex = 0;
+
 // -------------------------------------------------------------
 // Public services
 // -------------------------------------------------------------
@@ -47,31 +53,39 @@ uint16_t readHandPot() {
     // raw value is returned on 10bit
     uint16_t rawValue = analogRead(PIN_IN_HAND_POT);
 
-    // stick the raw value
-    const uint16_t stickyRange = 10;
-    if (rawValue > handPotStickyValue) {
-        if (rawValue - handPotStickyValue > stickyRange) {
-            handPotStickyValue = rawValue;
+    // mean on HAND_POT_LAST_VALUE_SIZE values
+    handPotLastValueIndex = (handPotLastValueIndex + 1) % HAND_POT_LAST_VALUE_SIZE;
+    handPotLastValues[handPotLastValueIndex] = rawValue;
+    uint32_t meanValueSum = 0;
+    for (uint8_t i = 0; i < HAND_POT_LAST_VALUE_SIZE; i++) {
+        meanValueSum += handPotLastValues[i];
+    }
+    uint16_t meanValue = meanValueSum / HAND_POT_LAST_VALUE_SIZE;
+
+    // stick the mean value
+    const uint16_t stickyRange = 5;
+    if (meanValue > handPotStickyValue) {
+        if (meanValue - handPotStickyValue > stickyRange) {
+            handPotStickyValue = meanValue;
         }
-    } else if (handPotStickyValue > rawValue) {
-        if (handPotStickyValue - rawValue > stickyRange) {
-            handPotStickyValue = rawValue;
+    } else if (handPotStickyValue > meanValue) {
+        if (handPotStickyValue - meanValue > stickyRange) {
+            handPotStickyValue = meanValue;
         }
     }
 
     // clamp min max to output range
-    const uint16_t minRawValue = 20;
-    const uint16_t maxRawValue = (1 << 10) - 20;
-    const uint16_t clampedRange = maxRawValue - minRawValue;
+    const uint16_t minClampValue = 0;
+    const uint16_t maxClampValue = (1 << 10) - 10;
+    const uint16_t clampedRange = maxClampValue - minClampValue;
     uint16_t clamped = handPotStickyValue;
-    clamped = max(clamped, minRawValue);
-    clamped = min(clamped, maxRawValue);
-    clamped = clamped - minRawValue;
-    // clamped is now in range [0 .. clampedRange - 1]
-
+    clamped = max(clamped, minClampValue);
+    clamped = min(clamped, maxClampValue);
+    clamped = clamped - minClampValue;
     const uint32_t outRange = MAX_POT_VALUE - MIN_POT_VALUE;
-    uint16_t output = ((uint32_t)clamped * (uint32_t)outRange) / (uint32_t)clampedRange;
-    return output + MIN_POT_VALUE;
+    uint16_t output = ((uint32_t)clamped * (uint32_t)outRange) / (uint32_t)clampedRange + MIN_POT_VALUE;
+
+    return output;
 }
 
 void setDirection(Channel_T channel, bool isClockwise) {
