@@ -11,12 +11,11 @@
 // Led
 
 #define IDLE_LED_SWITCH_PERIOD_IN_US 1000000
-#define ENABLED_LED_SWITCH_PERIOD_IN_US 200000
-#define ROTATING_LED_SWITCH_PERIOD_IN_US 50000
+#define ENABLED_LED_SWITCH_PERIOD_IN_US 100000
 
 // Monitoring
 
-#define IS_SERIAL_LOG_ENABLED true
+#define IS_SERIAL_LOG_ENABLED
 #define SERIAL_LOG_PERIOD_IN_US 1000000
 
 // Drivers
@@ -73,7 +72,6 @@ uint32_t lastLogTime = 0;
 
 bool lastCycleEnabled = false;
 bool lastCycleRotating = false;
-uint16_t lastFreqHandPot = 0;
 
 // -------------------------------------------------------------
 // Private services
@@ -111,6 +109,7 @@ void setup() {
     timer1::disable();
 
     Serial.begin(115200);
+#ifdef IS_SERIAL_LOG_ENABLED
     Serial.println("===================");
     Serial.println("Firmware: itr-stepper-wire v0.1");
 
@@ -137,6 +136,7 @@ void setup() {
     Serial.print(MIN_SPEED_TIMER1_COUNT);
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_TIMER1_COUNT);
+#endif
 
     // sleep to wait for power suply stabilisation
     delay(500);
@@ -156,10 +156,11 @@ void loop() {
 
     // read inputs
     uint16_t handPot = readHandPot();
+    uint16_t footPot = readFootPot();
 
     // compute cycle state
     bool isEnabled = handPot > (lastCycleEnabled ? 0 : 100);
-    bool isRotating = handPot > (lastCycleRotating ? 100 : 200);
+    bool isRotating = isEnabled && (timer1::getFrequencyInHz() != MIN_SPEED_ITR_FREQ_IN_HZ || footPot > (lastCycleRotating ? 0 : 100));
 
     // set driver enable
     if (isEnabled != lastCycleEnabled) {
@@ -175,9 +176,9 @@ void loop() {
         timer1::disable();
     }
 
-    if (isRotating && lastFreqHandPot != handPot) {
-        const uint32_t maxSpeed = MAX_POT_VALUE - 200;
-        uint32_t speed = handPot >= 200 ? handPot - 200 : 0;
+    if (isRotating) {
+        uint32_t maxSpeed = MAX_POT_VALUE;
+        uint32_t speed = ((uint32_t)(max(handPot, 100) - 100) * (uint32_t)footPot) / MAX_POT_VALUE;
         uint32_t frequency = speed * (MAX_SPEED_ITR_FREQ_IN_HZ - MIN_SPEED_ITR_FREQ_IN_HZ) / maxSpeed + MIN_SPEED_ITR_FREQ_IN_HZ;
         timer1::setRampFrequency(frequency, 2000);
         speedAdjustCounter++;
@@ -185,23 +186,20 @@ void loop() {
 
     lastCycleEnabled = isEnabled;
     lastCycleRotating = isRotating;
-    lastFreqHandPot = handPot;
 
     // blink led
     uint32_t ledSwitchPeriod = IDLE_LED_SWITCH_PERIOD_IN_US;
     if (isEnabled) {
         ledSwitchPeriod = ENABLED_LED_SWITCH_PERIOD_IN_US;
     }
-    if (isRotating) {
-        ledSwitchPeriod = ROTATING_LED_SWITCH_PERIOD_IN_US;
-    }
     if (periodical(loopTime, ledSwitchPeriod, &lastLedSwitchTime)) {
         lastLedState = !lastLedState;
         digitalWrite(LED_BUILTIN, lastLedState);
     }
 
+#ifdef IS_SERIAL_LOG_ENABLED
     // produce logs
-    if (IS_SERIAL_LOG_ENABLED && periodical(loopTime, SERIAL_LOG_PERIOD_IN_US, &lastLogTime)) {
+    if (periodical(loopTime, SERIAL_LOG_PERIOD_IN_US, &lastLogTime)) {
         Serial.println("---");
         Serial.print("time        : ");
         Serial.println(loopTime);
@@ -212,6 +210,9 @@ void loop() {
 
         Serial.print("hand pot    : ");
         Serial.println(handPot);
+
+        Serial.print("foot pot    : ");
+        Serial.println(footPot);
 
         uint32_t counterValue = timer1ItrCounter;
         timer1ItrCounter -= counterValue;
@@ -227,4 +228,5 @@ void loop() {
             Serial.println(flushed);
         }
     }
+#endif
 }

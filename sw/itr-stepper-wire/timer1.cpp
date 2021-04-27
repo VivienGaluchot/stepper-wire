@@ -85,6 +85,7 @@ void timer1::disable() {
     TCCR1B = 0;
     TIMSK1 = 0;
     interrupts();
+    currentItrFreqInHz = 0;
 }
 
 void timer1::enable(void (*callback)(void)) {

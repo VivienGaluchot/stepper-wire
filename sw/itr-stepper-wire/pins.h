@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define PIN_IN_HAND_POT A0
+#define PIN_IN_FOOT_POT A1
 
 #define PIN_OUT_CH1_DIR 2
 #define PIN_OUT_CH1_STEP 3
@@ -30,6 +31,9 @@ void initializePins();
 
 // return in range MIN_POT_VALUE .. MAX_POT_VALUE
 uint16_t readHandPot();
+
+// return in range MIN_POT_VALUE .. MAX_POT_VALUE
+uint16_t readFootPot();
 
 void setDirection(Channel_T channel, bool isClockwise);
 
