@@ -5,6 +5,14 @@
 #include "timer1.h"
 
 // -------------------------------------------------------------
+// Time
+// -------------------------------------------------------------
+
+#define SEC_PER_MIN 60ULL
+
+#define USEC_PER_SEC 1000000UL
+
+// -------------------------------------------------------------
 // Configuration
 // -------------------------------------------------------------
 
@@ -26,6 +34,8 @@
 // pin configurations
 #define DRIVER_MICROSTEPPING 2UL
 
+#define DRIVER_KEEP_ENABLED_IN_US (5 * USEC_PER_SEC)
+
 // Motor
 
 // number of step per turn in the motor
@@ -40,7 +50,6 @@
 // ITR period computation
 // -------------------------------------------------------------
 
-#define SEC_PER_MIN 60ULL
 #define ITR_PER_STEP 1ULL
 
 #define RPM_TO_ITR_FREQ_IN_HZ(x) (x * DRIVER_MICROSTEPPING * ITR_PER_STEP * MOTOR_STEP_PER_ROTATION / SEC_PER_MIN)
@@ -63,15 +72,18 @@ const uint32_t MAX_SPEED_TIMER1_COUNT = TIMER1_COUNT_FOR_PERIOD_IN_NS(MAX_SPEED_
 // -------------------------------------------------------------
 
 uint32_t timer1ItrCounter = 0;
-uint32_t speedAdjustCounter = 0;
+uint32_t cycles = 0;
 
 uint32_t lastLedSwitchTime = 0;
 bool lastLedState = LOW;
 
 uint32_t lastLogTime = 0;
 
-bool lastCycleEnabled = false;
-bool lastCycleRotating = false;
+bool isLastCycleFootPressed = false;
+bool isLastCycleEnabled = false;
+bool isLastCycleRotating = false;
+
+uint32_t lastRotatingCycle = 0;
 
 // -------------------------------------------------------------
 // Private services
@@ -114,31 +126,33 @@ void setup() {
     Serial.println("Firmware: itr-stepper-wire v0.1");
 
     Serial.println("Configuration:");
-    Serial.print(" - DRIVER_MICROSTEPPING    ");
+    Serial.print(" - DRIVER_MICROSTEPPING      ");
     Serial.println(DRIVER_MICROSTEPPING);
-    Serial.print(" - MOTOR_STEP_PER_ROTATION ");
+    Serial.print(" - MOTOR_STEP_PER_ROTATION   ");
     Serial.println(MOTOR_STEP_PER_ROTATION);
-    Serial.print(" - SPEED_MOTOR_RPM         ");
+    Serial.print(" - SPEED_MOTOR_RPM           ");
     Serial.print(MIN_SPEED_MOTOR_RPM);
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_MOTOR_RPM);
+    Serial.print(" - DRIVER_KEEP_ENABLED_IN_US ");
+    Serial.println(DRIVER_KEEP_ENABLED_IN_US);
 
-    Serial.print(" - ITR_FREQ_IN_HZ          ");
+    Serial.print(" - ITR_FREQ_IN_HZ            ");
     Serial.print(MIN_SPEED_ITR_FREQ_IN_HZ);
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_ITR_FREQ_IN_HZ);
-    Serial.print(" - ITR_PERIOD_IN_NS        ");
+    Serial.print(" - ITR_PERIOD_IN_NS          ");
     Serial.print(MIN_SPEED_ITR_PERIOD_IN_NS);
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_ITR_PERIOD_IN_NS);
 
-    Serial.print(" - TIMER1_COUNT            ");
+    Serial.print(" - TIMER1_COUNT              ");
     Serial.print(MIN_SPEED_TIMER1_COUNT);
     Serial.print(" .. ");
     Serial.println(MAX_SPEED_TIMER1_COUNT);
 #endif
 
-    // sleep to wait for power suply stabilisation
+    // sleep to wait for power supply stabilization
     delay(500);
 
     setDirection(CHANNEL_1, true);
@@ -155,37 +169,32 @@ void loop() {
     uint32_t loopTime = micros();
 
     // read inputs
-    uint16_t handPot = readHandPot();
     uint16_t footPot = readFootPot();
+    bool isFootPressed = footPot > (isLastCycleFootPressed ? 0 : 50);
 
     // compute cycle state
-    bool isEnabled = handPot > (lastCycleEnabled ? 0 : 100);
-    bool isRotating = isEnabled && (timer1::getFrequencyInHz() != MIN_SPEED_ITR_FREQ_IN_HZ || footPot > (lastCycleRotating ? 0 : 100));
+    bool isTimerStillRunning = timer1::getFrequencyInHz() > MIN_SPEED_ITR_FREQ_IN_HZ;
+    bool isDriverKeepEnabled = (loopTime - lastRotatingCycle) < DRIVER_KEEP_ENABLED_IN_US;
+    bool isEnabled = isFootPressed || isTimerStillRunning || isDriverKeepEnabled;
+    bool isRotating = isFootPressed || isTimerStillRunning;
 
     // set driver enable
-    if (isEnabled != lastCycleEnabled) {
+    if (isEnabled != isLastCycleEnabled) {
         setEnable(CHANNEL_1, isEnabled);
         setEnable(CHANNEL_2, isEnabled);
     }
 
     // set timer period
-    if (isRotating && !lastCycleRotating) {
+    if (isRotating && !isLastCycleRotating) {
         timer1::setFrequency(MIN_SPEED_ITR_FREQ_IN_HZ);
         timer1::enable(&timerCallback);
-    } else if (!isRotating && lastCycleRotating) {
+    } else if (!isRotating && isLastCycleRotating) {
         timer1::disable();
-    }
-
-    if (isRotating) {
+    } else if (isRotating) {
         uint32_t maxSpeed = MAX_POT_VALUE;
-        uint32_t speed = ((uint32_t)(max(handPot, 100) - 100) * (uint32_t)footPot) / MAX_POT_VALUE;
-        uint32_t frequency = speed * (MAX_SPEED_ITR_FREQ_IN_HZ - MIN_SPEED_ITR_FREQ_IN_HZ) / maxSpeed + MIN_SPEED_ITR_FREQ_IN_HZ;
+        uint32_t frequency = footPot * (MAX_SPEED_ITR_FREQ_IN_HZ - MIN_SPEED_ITR_FREQ_IN_HZ) / maxSpeed + MIN_SPEED_ITR_FREQ_IN_HZ;
         timer1::setRampFrequency(frequency, 2000);
-        speedAdjustCounter++;
     }
-
-    lastCycleEnabled = isEnabled;
-    lastCycleRotating = isRotating;
 
     // blink led
     uint32_t ledSwitchPeriod = IDLE_LED_SWITCH_PERIOD_IN_US;
@@ -204,15 +213,18 @@ void loop() {
         Serial.print("time        : ");
         Serial.println(loopTime);
 
-        Serial.print("speed adjust: ");
-        Serial.println(speedAdjustCounter);
-        speedAdjustCounter = 0;
-
-        Serial.print("hand pot    : ");
-        Serial.println(handPot);
+        Serial.print("cycles      : ");
+        Serial.println(cycles);
+        cycles = 0;
 
         Serial.print("foot pot    : ");
         Serial.println(footPot);
+
+        Serial.print("enabled     : ");
+        Serial.println(isEnabled);
+
+        Serial.print("rotating    : ");
+        Serial.println(isRotating);
 
         uint32_t counterValue = timer1ItrCounter;
         timer1ItrCounter -= counterValue;
@@ -228,5 +240,14 @@ void loop() {
             Serial.println(flushed);
         }
     }
+    cycles++;
 #endif
+
+    // end of cycle
+    isLastCycleFootPressed = isFootPressed;
+    isLastCycleEnabled = isEnabled;
+    isLastCycleRotating = isRotating;
+    if (isRotating) {
+        lastRotatingCycle = loopTime;
+    }
 }

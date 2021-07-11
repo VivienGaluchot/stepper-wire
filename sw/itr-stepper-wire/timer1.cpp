@@ -19,7 +19,7 @@ static volatile uint16_t currentItrFreqInHz = 0;
 
 // when true the period ramp is enabled
 static volatile bool rampIsEnabled = false;
-// total number of itr interrupt ellapsed since the last ramp
+// total number of itr interrupt elapsed since the last ramp
 static volatile uint16_t rampLastPeriod = 0;
 // total number of itr interrupt between each ramp
 static volatile uint16_t rampPeriod = 0;
@@ -152,22 +152,6 @@ void timer1::setRampFrequency(uint32_t itrFreqInHz, uint32_t rateInHzPerS) {
     }
 
     rampIsEnabled = true;
-
-    // Serial.println("setRampPeriod, options:");
-    // Serial.print("  - current ");
-    // Serial.println(currentItrFreqInHz);
-
-    // Serial.print("  - final   ");
-    // Serial.println(rampFinalInHz);
-
-    // Serial.print("  - period in us ");
-    // Serial.println(periodInUs);
-
-    // Serial.print("  - period in ticks ");
-    // Serial.println(rampPeriod);
-
-    // Serial.print("  - step    ");
-    // Serial.println(rampStepInHz);
 }
 
 uint16_t timer1::getFrequencyInHz() {
