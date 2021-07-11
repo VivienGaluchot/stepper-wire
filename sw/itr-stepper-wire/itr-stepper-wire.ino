@@ -83,6 +83,7 @@ bool isLastCycleFootPressed = false;
 bool isLastCycleEnabled = false;
 bool isLastCycleRotating = false;
 
+bool isLastRotatingCycleSet = false;
 uint32_t lastRotatingCycle = 0;
 
 // -------------------------------------------------------------
@@ -123,7 +124,7 @@ void setup() {
     Serial.begin(115200);
 #ifdef IS_SERIAL_LOG_ENABLED
     Serial.println("===================");
-    Serial.println("Firmware: itr-stepper-wire v0.1");
+    Serial.println("Firmware: itr-stepper-wire v0.2");
 
     Serial.println("Configuration:");
     Serial.print(" - DRIVER_MICROSTEPPING      ");
@@ -140,6 +141,7 @@ void setup() {
     Serial.print(" - ITR_FREQ_IN_HZ            ");
     Serial.print(MIN_SPEED_ITR_FREQ_IN_HZ);
     Serial.print(" .. ");
+
     Serial.println(MAX_SPEED_ITR_FREQ_IN_HZ);
     Serial.print(" - ITR_PERIOD_IN_NS          ");
     Serial.print(MIN_SPEED_ITR_PERIOD_IN_NS);
@@ -174,7 +176,7 @@ void loop() {
 
     // compute cycle state
     bool isTimerStillRunning = timer1::getFrequencyInHz() > MIN_SPEED_ITR_FREQ_IN_HZ;
-    bool isDriverKeepEnabled = (loopTime - lastRotatingCycle) < DRIVER_KEEP_ENABLED_IN_US;
+    bool isDriverKeepEnabled = isLastRotatingCycleSet && ((loopTime - lastRotatingCycle) < DRIVER_KEEP_ENABLED_IN_US);
     bool isEnabled = isFootPressed || isTimerStillRunning || isDriverKeepEnabled;
     bool isRotating = isFootPressed || isTimerStillRunning;
 
@@ -249,5 +251,6 @@ void loop() {
     isLastCycleRotating = isRotating;
     if (isRotating) {
         lastRotatingCycle = loopTime;
+        isLastRotatingCycleSet = true;
     }
 }
